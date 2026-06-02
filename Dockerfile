@@ -4,6 +4,7 @@ FROM node:20-slim AS builder
 RUN apt-get update -y && apt-get install -y \
     openssl \
     ca-certificates \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,12 +12,13 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm install
+# Instalação LIMPA (melhor que npm install)
+RUN npm ci --production=false
 
 COPY . .
 RUN npm run build
 
-# Imagem final
+# === Imagem final ===
 FROM node:20-slim
 
 RUN apt-get update -y && apt-get install -y \
@@ -34,5 +36,4 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
-# Gera cliente Prisma (garante que esteja presente) e inicia
 CMD ["sh", "-c", "npx prisma generate && npm run start:prod"]
