@@ -1,0 +1,145 @@
+### ============================================
+### PROVENI - COMPANY SUPPLIERS API TESTS
+### ============================================
+
+@baseUrl = http://localhost:3001
+
+### ============================================
+### 1. AUTENTICAÇÃO
+### ============================================
+
+### 1.1 Login como MANAGER (usar token abaixo)
+# @name managerLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "marina@bonequinhos.com.br",
+  "password": "marina123"
+}
+
+### 1.2 Login como ADMIN (quando precisar passar companyId manualmente)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@proveni.com",
+  "password": "admin123"
+}
+
+### Coloque os tokens abaixo após fazer login
+@managerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXBoeHh1ZHMwMDAybHdtbjh1dWdpdHQyIiwiZW1haWwiOiJtYXJpbmFAYm9uZXF1aW5ob3MuY29tLmJyIiwicm9sZSI6Ik1BTkFHRVIiLCJjb21wYW55SWQiOiJjbXBoeHh1M2MwMDAxbHdtbjNkdzhkMXloIiwiaWF0IjoxNzc5NTE5MzU1LCJleHAiOjE3ODAxMjQxNTV9.Q9FQZllQPCIqlMTOnr_TRhVJSSNzIy5PAI9HqMJgxzc
+@adminToken   = SEU_TOKEN_ADMIN_AQUI
+
+### ============================================
+### 2. POST /company-suppliers/direct
+###    Cria um fornecedor e já vincula à empresa
+###    Roles permitidas: MANAGER, ADMIN
+### ============================================
+
+### 2.1 MANAGER cria fornecedor diretamente
+###     (companyId é inferido do token automaticamente)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "supplierName": "Fornecedor Direto Ltda",
+  "cnpj": "11.111.111/0001-11",
+  "email": "contato@fornecedordireto.com",
+  "phone": "(11) 91111-1111",
+  "responsibleName": "João da Silva"
+}
+
+### 2.2 MANAGER cria fornecedor sem responsável (campos opcionais omitidos)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "supplierName": "Fornecedor Simples S/A",
+  "cnpj": "22.222.222/0001-22",
+  "email": "contato@fornecedorsimples.com"
+}
+
+### 2.3 ADMIN cria fornecedor passando companyId explicitamente
+###     (ADMIN não tem companyId no token, então precisa enviar no body)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "supplierName": "Fornecedor via Admin",
+  "cnpj": "33.333.333/0001-33",
+  "email": "contato@fornecedoradmin.com",
+  "phone": "(11) 93333-3333",
+  "responsibleName": "Maria Souza",
+  "companyId": "ID_DA_EMPRESA_ALVO_AQUI"
+}
+
+### 2.4 Testa CNPJ já existente (deve vincular o existente à empresa sem criar novo)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "supplierName": "Qualquer Nome",
+  "cnpj": "11.111.111/0001-11",
+  "email": "qualquer@email.com"
+}
+
+### 2.5 Testa body inválido - faltando campos obrigatórios (deve retornar 400)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "phone": "(11) 99999-9999"
+}
+
+### ============================================
+### 3. GET /company-suppliers
+###    Lista os fornecedores ATIVOS da empresa do usuário logado
+###    Roles permitidas: MANAGER, ADMIN
+### ============================================
+
+### 3.1 MANAGER lista fornecedores da sua empresa
+GET {{baseUrl}}/company-suppliers
+Authorization: Bearer {{managerToken}}
+
+### 3.2 ADMIN lista fornecedores (baseado no companyId do token — nulo p/ ADMIN)
+GET {{baseUrl}}/company-suppliers
+Authorization: Bearer {{adminToken}}
+
+### ============================================
+### 4. DELETE /company-suppliers/:supplierId
+###    Bloqueia um fornecedor (status → BLOCKED)
+###    Roles permitidas: MANAGER, ADMIN
+### ============================================
+
+### 4.1 MANAGER bloqueia um fornecedor (substitua pelo supplierId real)
+DELETE {{baseUrl}}/company-suppliers/ID_DO_SUPPLIER_AQUI
+Authorization: Bearer {{managerToken}}
+
+### 4.2 Tenta bloquear fornecedor inexistente (deve retornar 500 ou 404)
+DELETE {{baseUrl}}/company-suppliers/id-que-nao-existe
+Authorization: Bearer {{managerToken}}
+
+### ============================================
+### 5. TESTES DE AUTORIZAÇÃO
+### ============================================
+
+### 5.1 Supplier tenta criar fornecedor (deve retornar 403 Forbidden)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer SEU_TOKEN_SUPPLIER_AQUI
+Content-Type: application/json
+
+{
+  "supplierName": "Tentativa Inválida",
+  "cnpj": "99.000.000/0001-00",
+  "email": "invalido@teste.com"
+}
+
+### 5.2 Sem token (deve retornar 401 Unauthorized)
+GET {{baseUrl}}/company-suppliers

@@ -1,0 +1,204 @@
+### ============================================
+### PROVENI - API TESTS (VERSÃO CORRIGIDA)
+### ============================================
+
+### VARIÁVEIS
+@baseUrl = http://localhost:3001
+
+### ============================================
+### 1. AUTENTICAÇÃO
+### ============================================
+
+### 1.1 Login ADMIN
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@proveni.com",
+  "password": "admin123"
+}
+
+### 1.2 Login MANAGER
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "marina@bonequinhos.com.br",
+  "password": "marina123"
+}
+
+### 1.3 Login OPERATOR
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@proveni.com",
+  "password": "operator123"
+}
+
+### 1.4 Login SPECIALIST
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "specialist@proveni.com",
+  "password": "specialist123"
+}
+
+### 1.5 Login SUPPLIER
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "roberto@ecoplast.com.br",
+  "password": "ecoplast123"
+}
+
+### ============================================
+### 2. EMPRESAS (ADMIN apenas)
+### ============================================
+
+### 2.1 Listar todas empresas (ADMIN)
+GET {{baseUrl}}/companies
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXBoeHh1MGIwMDAwbHdtbnBudHBzMWFzIiwiZW1haWwiOiJhZG1pbkBwcm92ZW5pLmNvbSIsInJvbGUiOiJBRE1JTiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzc5NTE2MjY0LCJleHAiOjE3ODAxMjEwNjR9.CJuQQp1CDLFMPetB52Xjp2LKe4Yoo-dOB_bS14bv8os
+
+### 2.2 Criar empresa (ADMIN)
+POST {{baseUrl}}/companies
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXBoeHh1MGIwMDAwbHdtbnBudHBzMWFzIiwiZW1haWwiOiJhZG1pbkBwcm92ZW5pLmNvbSIsInJvbGUiOiJBRE1JTiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzc5NTE2MjY0LCJleHAiOjE3ODAxMjEwNjR9.CJuQQp1CDLFMPetB52Xjp2LKe4Yoo-dOB_bS14bv8os
+Content-Type: application/json
+
+{
+  "name": "Nova Indústria Teste",
+  "cnpj": "99.888.777/0001-66",
+  "email": "teste@empresa.com",
+  "companyType": "CLIENT",
+  "plan": "PROFESSIONAL"
+}
+
+### ============================================
+### 3. FORNECEDORES (MANAGER)
+### ============================================
+
+### 3.1 Criar fornecedor diretamente (MANAGER)
+POST {{baseUrl}}/company-suppliers/direct
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+Content-Type: application/json
+
+{
+  "supplierName": "Fornecedor Teste Ltda",
+  "cnpj": "11.111.111/0001-11",
+  "email": "contato@fornecedorteste.com",
+  "responsibleName": "João Silva"
+}
+
+### 3.2 Listar fornecedores (MANAGER)
+GET {{baseUrl}}/company-suppliers
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+
+### ============================================
+### 4. LOTES (MANAGER)
+### ============================================
+
+### 4.1 Criar lote (MANAGER)
+POST {{baseUrl}}/batches
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+Content-Type: application/json
+
+{
+  "batchId": "LOT-001",
+  "productName": "Produto Teste",
+  "quantity": 1000,
+  "unit": "un"
+}
+
+### 4.2 Listar lotes (MANAGER)
+GET {{baseUrl}}/batches
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+
+### 4.3 Buscar lote específico (MANAGER)
+GET {{baseUrl}}/batches/LOT-001
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+
+### 4.4 Calcular CO2 do lote (MANAGER)
+POST {{baseUrl}}/batches/LOT-001/calculate-co2
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+
+### ============================================
+### 5. DOCUMENTOS (SUPPLIER)
+### ============================================
+
+### 5.1 Upload de documento (FORNECEDOR)
+POST {{baseUrl}}/documents/upload
+Authorization: Bearer SEU_TOKEN_SUPPLIER_AQUI
+Content-Type: multipart/form-data; boundary=boundary123
+
+--boundary123
+Content-Disposition: form-data; name="batchId"
+
+LOT-001
+--boundary123
+Content-Disposition: form-data; name="docType"
+
+INVOICE
+--boundary123
+Content-Disposition: form-data; name="file"; filename="teste.txt"
+Content-Type: text/plain
+
+Este é um arquivo de teste
+--boundary123--
+
+### ============================================
+### 6. PROCESSAR DOCUMENTOS (OPERATOR)
+### ============================================
+
+### 6.1 Ver documentos pendentes (OPERATOR)
+GET {{baseUrl}}/documents/pending
+Authorization: Bearer SEU_TOKEN_OPERATOR_AQUI
+
+### ============================================
+### 7. VALIDAR DOCUMENTOS (SPECIALIST)
+### ============================================
+
+### 7.1 Validar documento (SPECIALIST)
+POST {{baseUrl}}/documents/ID_DO_DOCUMENTO_AQUI/validate
+Authorization: Bearer SEU_TOKEN_SPECIALIST_AQUI
+Content-Type: application/json
+
+{
+  "extractedData": {
+    "productName": "Produto Validado",
+    "co2Emitted": 150,
+    "supplier": "Fornecedor Teste"
+  }
+}
+
+### ============================================
+### 8. DASHBOARD
+### ============================================
+
+### 8.1 Dashboard da empresa (MANAGER)
+GET {{baseUrl}}/companies/dashboard
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI
+
+### ============================================
+### 9. ADMIN - ESTATÍSTICAS
+### ============================================
+
+### 9.1 Estatísticas do sistema (ADMIN)
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer SEU_TOKEN_ADMIN_AQUI
+
+### 9.2 Criar empresa com gerente (ADMIN)
+POST {{baseUrl}}/admin/companies-with-manager
+Authorization: Bearer SEU_TOKEN_ADMIN_AQUI
+Content-Type: application/json
+
+{
+  "companyName": "Empresa Rápida",
+  "companyCnpj": "22.222.222/0001-22",
+  "companyEmail": "contato@empresarapida.com",
+  "plan": "BASIC",
+  "managerName": "João Gerente",
+  "managerEmail": "joao@empresarapida.com",
+  "managerPassword": "joao123"
+}

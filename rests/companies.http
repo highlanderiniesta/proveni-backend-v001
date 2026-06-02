@@ -1,0 +1,158 @@
+### ============================================
+### PROVENI - COMPANIES API TESTS
+### ============================================
+
+@baseUrl = http://localhost:3001
+
+### ============================================
+### 1. AUTENTICAÇÃO PRIMEIRO
+### ============================================
+
+### 1.1 Login como ADMIN (pegar token)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@proveni.com",
+  "password": "admin123"
+}
+
+### Copie o access_token da resposta acima e cole abaixo
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXBoeHh1MGIwMDAwbHdtbnBudHBzMWFzIiwiZW1haWwiOiJhZG1pbkBwcm92ZW5pLmNvbSIsInJvbGUiOiJBRE1JTiIsImNvbXBhbnlJZCI6bnVsbCwiaWF0IjoxNzc5NTE3ODQ1LCJleHAiOjE3ODAxMjI2NDV9.Q1Z0y5sYR0iXeX-YaTEkkcQWrKPN7HkPWaZktvnE3d8
+
+### ============================================
+### 2. COMPANIES (EMPRESAS)
+### ============================================
+
+### 2.1 Listar todas empresas (ADMIN)
+GET {{baseUrl}}/companies
+Authorization: Bearer {{adminToken}}
+
+### 2.2 Criar nova empresa (ADMIN)
+POST {{baseUrl}}/companies
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Minha Empresa Teste",
+  "cnpj": "02.345.678/0001-92",
+  "email": "contato@minhaempresa.com",
+  "phone": "(11) 99999-9999",
+  "companyType": "CLIENT",
+  "plan": "PROFESSIONAL"
+}
+
+### 2.3 Criar outra empresa com CNPJ diferente
+POST {{baseUrl}}/companies
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Nova Indústria Ltda",
+  "cnpj": "99.888.777/0001-66",
+  "email": "contato@novaindustria.com",
+  "phone": "(11) 98888-7777",
+  "companyType": "CLIENT",
+  "plan": "BASIC"
+}
+
+### 2.4 Criar empresa tipo BOTH (cliente e fornecedor)
+POST {{baseUrl}}/companies
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "EcoPlast S/A",
+  "cnpj": "29.765.432/0001-98",
+  "email": "contato@ecoplast.com.br",
+  "phone": "(11) 97777-6666",
+  "companyType": "BOTH",
+  "plan": "PROFESSIONAL"
+}
+
+### 2.5 Buscar empresa por ID (substitua ID pelo retornado)
+GET {{baseUrl}}/companies/cmphz14j70002zomnxleo7bmt
+Authorization: Bearer {{adminToken}}
+
+### 2.6 Atualizar empresa (substitua ID)
+PUT {{baseUrl}}/companies/cmphz14j70002zomnxleo7bmt
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Empresa Atualizada",
+  "phone": "(11) 95555-4444"
+}
+
+### ============================================
+### 3. LOGIN COM DIFERENTES ROLES
+### ============================================
+
+### 3.1 Login MANAGER (cliente do seed)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "marina@bonequinhos.com.br",
+  "password": "marina123"
+}
+
+### 3.2 Login OPERATOR
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "operator@proveni.com",
+  "password": "operator123"
+}
+
+### 3.3 Login SPECIALIST
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "specialist@proveni.com",
+  "password": "specialist123"
+}
+
+### 3.4 Login SUPPLIER (fornecedor)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "roberto@ecoplast.com.br",
+  "password": "ecoplast123"
+}
+
+### ============================================
+### 4. ADMIN - ESTATÍSTICAS
+### ============================================
+
+### 4.1 Estatísticas do sistema
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+### 4.2 Criar empresa com gerente (batch)
+POST {{baseUrl}}/companies/with-manager
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "companyName": "TechGreen Indústria",
+  "companyCnpj": "55.444.333/0001-22",
+  "companyEmail": "contato@techgreen.com.br",
+  "companyPhone": "(11) 95555-4444",
+  "plan": "ENTERPRISE",
+  "managerName": "Carlos Souza",
+  "managerEmail": "carlos@techgreen.com.br",
+  "managerPassword": "carlos123"
+}
+
+### ============================================
+### 5. MANAGER - DASHBOARD
+### ============================================
+
+### 5.1 Dashboard da empresa (usar token do MANAGER)
+GET {{baseUrl}}/companies/dashboard
+Authorization: Bearer SEU_TOKEN_MANAGER_AQUI

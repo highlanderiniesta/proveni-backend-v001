@@ -1,0 +1,479 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyType {
+  CLIENT // Empresa que paga e exporta
+  SUPPLIER // Fornecedor que envia documentos
+  BOTH // Ambos (ex: EcoPlast que é fornecedor e também exporta)
+}
+
+enum Plan {
+  BASIC // Até 500 lotes/ano
+  PROFESSIONAL // Até 5.000 lotes/ano
+  ENTERPRISE // Ilimitado
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  SUPPLIER // Fornecedor - envia documentos
+  OPERATOR // Operador PROVENI - processa documentos
+  SPECIALIST // Especialista ESG - valida e registra na blockchain
+  MANAGER // Gestor ESG (cliente) - dashboard e decisões
+  ADMIN // Administrador PROVENI - tudo
+}
+
+enum BatchStatus {
+  DRAFT // Rascunho criado
+  PROCESSING // IA processando documentos
+  AWAITING_REVIEW // Aguardando especialista revisar
+  VALIDATED // Especialista aprovou
+  REJECTED // Especialista rejeitou
+  BLOCKCHAIN // Registrando na blockchain
+  COMPLETED // Finalizado com sucesso
+  ERROR // Erro no processo
+}
+
+enum DocumentType {
+  INVOICE // Nota fiscal (NF-e/XML)
+  CARBON_REPORT // Relatório de carbono
+  CERTIFICATE // Certificado (FSC, EU Ecolabel)
+  TRANSPORT // Conhecimento de transporte (CT-e)
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING // Aguardando processamento
+  PROCESSING // IA processando
+  EXTRACTED // Dados extraídos
+  NEEDS_REVIEW // IA com baixa confiança
+  VALIDATED // Validado pelo operador
+  REJECTED // Rejeitado
+  ON_CHAIN // Enviado para blockchain
+}
+
+enum SupplierRelationshipStatus {
+  PENDING // Convite enviado, aguardando
+  ACTIVE // Fornecedor ativo
+  BLOCKED // Bloqueado pelo cliente
+  INACTIVE // Relacionamento encerrado
+}
+
+enum PeriodType {
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
+enum NotificationType {
+  BATCH_VALIDATED
+  BATCH_REJECTED
+  SUPPLIER_INVITE
+  DOCUMENT_NEEDED
+  COMPLIANCE_ALERT
+  BLOCKCHAIN_CONFIRMED
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  RETRY
+}
+
+// ==================== MODELS ====================
+
+model Company {
+  id      String  @id @default(cuid())
+  name    String
+  cnpj    String  @unique
+  email   String
+  phone   String?
+  address String?
+  city    String?
+  state   String?
+  country String  @default("Brasil")
+
+  companyType   CompanyType
+  plan          Plan        @default(BASIC)
+  planStartedAt DateTime?
+  planEndsAt    DateTime?
+
+  status CompanyStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  users          User[]
+  batches        Batch[]
+  suppliersFrom  CompanySupplier[] @relation("Company")
+  suppliersTo    CompanySupplier[] @relation("Supplier")
+  metrics        Metric[]
+  dashboardViews DashboardView[]
+  documents      Document[]
+  batchSuppliers BatchSupplier[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String
+  phone        String?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  role      Role
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  validatedBatches   Batch[]          @relation("Validator")
+  uploadedDocuments  Document[]       @relation("Uploader")
+  validatedDocuments Document[]       @relation("Validator")
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  complianceRules    ComplianceRule[]
+  dashboardViews     DashboardView[]
+
+  @@map("users")
+}
+
+model CompanySupplier {
+  id         String                     @id @default(cuid())
+  companyId  String
+  supplierId String
+  status     SupplierRelationshipStatus @default(PENDING)
+  invitedAt  DateTime                   @default(now())
+  acceptedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company @relation("Company", fields: [companyId], references: [id])
+  supplier Company @relation("Supplier", fields: [supplierId], references: [id])
+
+  @@unique([companyId, supplierId])
+  @@map("company_suppliers")
+}
+
+model Batch {
+  id                 String  @id @default(cuid())
+  batchId            String  @unique
+  productName        String
+  productDescription String?
+  quantity           Float?
+  unit               String?
+  ncmCode            String?
+
+  // Exportação
+  countryOfOrigin    String?
+  destinationCountry String?
+  totalValue         Float?
+  currency           String?
+  incoterm           String?
+  shippingDate       DateTime?
+  estimatedArrival   DateTime?
+
+  // Pegada de carbono
+  co2Emitted Float?
+  co2PerUnit Float?
+
+  // Conformidade
+  isCompliant      Boolean @default(false)
+  complianceReason String?
+  complianceRuleId String?
+
+  // Relacionamentos
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  validatedById String?
+  validatedBy   User?   @relation("Validator", fields: [validatedById], references: [id])
+
+  // Blockchain
+  blockchainTxHash       String?
+  ipfsDocumentHash       String?
+  ipfsInspectionHash     String?
+  nftTokenId             Int?
+  auditorAddress         String?
+  blockchainRegisteredAt DateTime?
+
+  // Status
+  status         BatchStatus @default(DRAFT)
+  productionDate DateTime?
+  registeredAt   DateTime    @default(now())
+  validatedAt    DateTime?
+  auditedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  documents      Document[]
+  batchSuppliers BatchSupplier[]
+  syncLogs       SyncLog[]
+  notifications  Notification[]
+  complianceRule ComplianceRule? @relation(fields: [complianceRuleId], references: [id])
+
+  @@index([batchId])
+  @@index([companyId])
+  @@index([status])
+  @@index([isCompliant])
+  @@map("batches")
+}
+
+model Document {
+  id String @id @default(cuid())
+
+  batchId String?
+  batch   Batch?  @relation(fields: [batchId], references: [id])
+
+  supplierId String
+  supplier   Company @relation(fields: [supplierId], references: [id])
+
+  filename     String
+  originalName String?
+  fileSize     BigInt?
+  mimeType     String?
+  filePath     String?
+
+  // IPFS / Blockchain
+  ipfsHash     String?
+  documentHash String?
+
+  docType       DocumentType
+  extractedData Json? // JSON com dados extraídos pela IA
+
+  // Validação
+  isValidated     Boolean @default(false)
+  validatedById   String?
+  validatedBy     User?   @relation("Validator", fields: [validatedById], references: [id])
+  validationNotes String?
+
+  processingStatus DocumentStatus @default(PENDING)
+  confidenceScore  Float? // 0-100
+
+  uploadedById String?
+  uploadedBy   User?     @relation("Uploader", fields: [uploadedById], references: [id])
+  uploadedAt   DateTime  @default(now())
+  processedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  batchSuppliers BatchSupplier[]
+
+  @@index([batchId])
+  @@index([supplierId])
+  @@index([ipfsHash])
+  @@index([docType])
+  @@index([processingStatus])
+  @@map("documents")
+}
+
+model BatchSupplier {
+  id      String @id @default(cuid())
+  batchId String
+  batch   Batch  @relation(fields: [batchId], references: [id])
+
+  supplierId String
+  supplier   Company @relation(fields: [supplierId], references: [id])
+
+  productName String?
+  quantity    Float?
+  unit        String?
+  co2Emitted  Float?
+
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id])
+
+  includedAt DateTime @default(now())
+
+  @@unique([batchId, supplierId])
+  @@index([batchId])
+  @@index([supplierId])
+  @@map("batch_suppliers")
+}
+
+model Metric {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  periodType PeriodType
+  periodDate DateTime
+
+  // Métricas de carbono
+  totalCo2Emitted    Float  @default(0)
+  averageCo2PerBatch Float?
+
+  // Métricas de lotes
+  totalBatches        Int    @default(0)
+  compliantBatches    Int    @default(0)
+  nonCompliantBatches Int    @default(0)
+  complianceRate      Float?
+
+  // Métricas de fornecedores
+  totalSuppliers   Int @default(0)
+  activeSuppliers  Int @default(0)
+  blockedSuppliers Int @default(0)
+
+  // Métricas de blockchain
+  totalOnChainBatches Int @default(0)
+
+  calculatedAt DateTime @default(now())
+
+  @@unique([companyId, periodType, periodDate])
+  @@index([companyId, periodType, periodDate])
+  @@map("metrics")
+}
+
+model ComplianceRule {
+  id          String  @id @default(cuid())
+  ruleCode    String  @unique
+  name        String
+  description String?
+
+  productCategory String
+  ncmRange        String? // Faixa de NCM (ex: 3901..3909)
+
+  // Limites
+  co2Limit            Float
+  co2Unit             String @default("kg")
+  minRecycledContent  Float? // Percentual mínimo de reciclado
+  minRenewableContent Float? // Percentual mínimo de renovável
+
+  // Validade
+  validFrom  DateTime
+  validUntil DateTime?
+
+  isActive Boolean @default(true)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  batches Batch[]
+
+  @@index([productCategory])
+  @@index([isActive])
+  @@map("compliance_rules")
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String
+  type    NotificationType
+  link    String?
+  batchId String?
+  batch   Batch?           @relation(fields: [batchId], references: [id])
+
+  isRead Boolean @default(false)
+  isSent Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String  @id @default(cuid())
+  userId    String?
+  userEmail String?
+  userRole  Role?
+
+  action     String
+  entityType String?
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+
+  success      Boolean @default(true)
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model DashboardView {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  name      String
+  config    Json // Configuração dos widgets/filtros
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("dashboard_views")
+}
+
+model SyncLog {
+  id               String  @id @default(cuid())
+  batchId          String?
+  batch            Batch?  @relation(fields: [batchId], references: [id])
+  blockchainTxHash String?
+
+  syncStatus      SyncStatus
+  retryCount      Int        @default(0)
+  requestPayload  Json?
+  responsePayload Json?
+  errorMessage    String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([batchId])
+  @@index([syncStatus])
+  @@map("sync_logs")
+}

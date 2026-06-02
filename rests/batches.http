@@ -1,0 +1,181 @@
+### ============================================
+### PROVENI - BATCHES API TESTS
+### ============================================
+
+@baseUrl = http://localhost:3001
+
+### ============================================
+### 1. AUTENTICAÇÃO
+### ============================================
+
+### 1.1 Login como MANAGER
+# @name managerLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "marina@bonequinhos.com.br",
+  "password": "marina123"
+}
+
+### 1.2 Login como SPECIALIST (para calcular CO2 e ver conformidade)
+# @name specialistLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "specialist@proveni.com",
+  "password": "specialist123"
+}
+
+### Cole os tokens abaixo após fazer login
+@managerToken    = SEU_TOKEN_MANAGER_AQUI
+@specialistToken = SEU_TOKEN_SPECIALIST_AQUI
+
+### ============================================
+### 2. POST /batches
+###    Cria um novo lote (status inicial: DRAFT)
+###    Roles: MANAGER, ADMIN
+### ============================================
+
+### 2.1 Criar lote completo
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "batchId": "LOT-2026-001",
+  "productName": "Boneco de Plástico Reciclado",
+  "productDescription": "Boneco articulado feito com plástico reciclado PCR",
+  "quantity": 5000,
+  "unit": "un"
+}
+
+### 2.2 Criar lote mínimo (só campos obrigatórios)
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "batchId": "LOT-2026-002",
+  "productName": "Peça Injetada"
+}
+
+### 2.3 Criar outro lote para testes
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "batchId": "LOT-2026-003",
+  "productName": "Embalagem Biodegradável",
+  "productDescription": "Embalagem feita com material biodegradável",
+  "quantity": 10000,
+  "unit": "cx"
+}
+
+### 2.4 Testa batchId duplicado (deve retornar 500 - unique constraint)
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "batchId": "LOT-2026-001",
+  "productName": "Lote Duplicado"
+}
+
+### 2.5 Body inválido - faltando campos obrigatórios (400)
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "quantity": 100
+}
+
+### ============================================
+### 3. GET /batches
+###    Lista todos os lotes da empresa do usuário logado
+###    Roles: MANAGER, ADMIN
+### ============================================
+
+### 3.1 MANAGER lista lotes da sua empresa
+GET {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+
+### ============================================
+### 4. GET /batches/:batchId
+###    Busca um lote específico pelo batchId
+###    Roles: MANAGER, ADMIN
+### ============================================
+
+### 4.1 Buscar lote existente
+GET {{baseUrl}}/batches/LOT-2026-001
+Authorization: Bearer {{managerToken}}
+
+### 4.2 Buscar lote inexistente (deve retornar 404)
+GET {{baseUrl}}/batches/LOT-INEXISTENTE
+Authorization: Bearer {{managerToken}}
+
+### ============================================
+### 5. POST /batches/:batchId/calculate-co2
+###    Calcula o CO2 total do lote somando os BatchSuppliers
+###    Roles: MANAGER, ADMIN, SPECIALIST
+### ============================================
+
+### 5.1 MANAGER calcula CO2 do lote
+POST {{baseUrl}}/batches/LOT-2026-001/calculate-co2
+Authorization: Bearer {{managerToken}}
+
+### 5.2 SPECIALIST calcula CO2 do lote
+POST {{baseUrl}}/batches/LOT-2026-001/calculate-co2
+Authorization: Bearer {{specialistToken}}
+
+### 5.3 Calcular CO2 de lote inexistente (vai retornar totalCO2 = 0 pois não há BatchSuppliers)
+POST {{baseUrl}}/batches/LOT-2026-002/calculate-co2
+Authorization: Bearer {{managerToken}}
+
+### ============================================
+### 6. GET /batches/:batchId/compliance
+###    Verifica conformidade do lote com a regra de CO2
+###    Roles: MANAGER, ADMIN, SPECIALIST
+### ============================================
+
+### 6.1 MANAGER verifica conformidade (sem regra → sempre conforme)
+GET {{baseUrl}}/batches/LOT-2026-001/compliance
+Authorization: Bearer {{managerToken}}
+
+### 6.2 SPECIALIST verifica conformidade
+GET {{baseUrl}}/batches/LOT-2026-001/compliance
+Authorization: Bearer {{specialistToken}}
+
+### 6.3 Conformidade de lote inexistente (deve retornar 404)
+GET {{baseUrl}}/batches/LOT-INEXISTENTE/compliance
+Authorization: Bearer {{managerToken}}
+
+### ============================================
+### 7. TESTES DE AUTORIZAÇÃO
+### ============================================
+
+### 7.1 SUPPLIER tenta criar lote (deve retornar 403)
+POST {{baseUrl}}/batches
+Authorization: Bearer SEU_TOKEN_SUPPLIER_AQUI
+Content-Type: application/json
+
+{
+  "batchId": "LOT-INVALIDO",
+  "productName": "Lote Não Permitido"
+}
+
+### 7.2 OPERATOR tenta criar lote (deve retornar 403)
+POST {{baseUrl}}/batches
+Authorization: Bearer SEU_TOKEN_OPERATOR_AQUI
+Content-Type: application/json
+
+{
+  "batchId": "LOT-INVALIDO",
+  "productName": "Lote Não Permitido"
+}
+
+### 7.3 Sem token (deve retornar 401)
+GET {{baseUrl}}/batches

@@ -1,0 +1,169 @@
+### =========================================================================
+### PROVENI - FLUXO DE TESTE END-TO-END (E2E)
+### =========================================================================
+# Este arquivo contém o passo a passo completo para testar a aplicação de ponta
+# a ponta: do envio do documento pelo fornecedor até o registro e leitura na blockchain.
+#
+# Para rodar estes testes:
+# 1. Certifique-se de que o backend está rodando em http://localhost:3001
+# 2. Certifique-se de que o Hardhat Node local está rodando em http://localhost:8545
+# 3. Use a extensão "REST Client" no VS Code para executar as requisições.
+
+@baseUrl = http://localhost:3001
+
+### =========================================================================
+### PASSO 1: AUTENTICAÇÃO (LOGINS)
+### =========================================================================
+
+### 1.1 Login como GERENTE DO CLIENTE (Marina)
+# Executa as ações de criação do lote e visualização do dashboard.
+# @name managerLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "marina@bonequinhos.com.br",
+  "password": "marina123"
+}
+
+###
+@managerToken = {{managerLogin.response.body.access_token}}
+
+
+### 1.2 Login como FORNECEDOR (Roberto - EcoPlast)
+# Envia a nota fiscal / relatório de carbono.
+# @name supplierLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "roberto@ecoplast.com.br",
+  "password": "ecoplast123"
+}
+
+###
+@supplierToken = {{supplierLogin.response.body.access_token}}
+
+
+### 1.3 Login como ESPECIALISTA ESG (Auditor / Validador)
+# Valida os dados da IA, calcula emissão e envia para a Blockchain.
+# @name specialistLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "specialist@proveni.com",
+  "password": "specialist123"
+}
+
+###
+@specialistToken = {{specialistLogin.response.body.access_token}}
+
+
+### =========================================================================
+### PASSO 2: CRIAÇÃO DO LOTE DE PRODUÇÃO (MANAGER)
+### =========================================================================
+
+### 2.1 Gerente cria um novo Lote (Status inicial: DRAFT)
+# @name createBatch
+POST {{baseUrl}}/batches
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "batchId": "LOT-E2E-999",
+  "productName": "Garrafas Pet Recicladas PCR",
+  "productDescription": "Lote de garrafas injetadas utilizando 80% PCR de fornecedores homologados",
+  "quantity": 10000,
+  "unit": "un"
+}
+
+
+### =========================================================================
+### PASSO 3: UPLOAD DO DOCUMENTO AMBIENTAL (SUPPLIER)
+### =========================================================================
+
+### 3.1 Fornecedor faz o upload de uma nota fiscal / relatório para o lote criado
+# O arquivo "teste.pdf" já existe na pasta rests do projeto.
+# @name uploadDocument
+POST {{baseUrl}}/documents/upload
+Authorization: Bearer {{supplierToken}}
+Content-Type: multipart/form-data; boundary=boundary123
+
+--boundary123
+Content-Disposition: form-data; name="batchId"
+
+LOT-E2E-999
+--boundary123
+Content-Disposition: form-data; name="docType"
+
+INVOICE
+--boundary123
+Content-Disposition: form-data; name="file"; filename="teste.pdf"
+Content-Type: application/pdf
+
+< ./teste.pdf
+--boundary123--
+
+###
+@documentId = {{uploadDocument.response.body.id}}
+
+
+### =========================================================================
+### PASSO 4: EXTRAÇÃO DE DADOS POR INTELIGÊNCIA ARTIFICIAL
+### =========================================================================
+
+### 4.1 Solicita a extração dos dados de carbono via IA (OpenAI / Gemini / Claude)
+# O sistema lê o PDF enviado, faz o OCR e extrai os metadados do documento.
+POST {{baseUrl}}/documents/{{documentId}}/extract-ai
+Authorization: Bearer {{specialistToken}}
+
+
+### =========================================================================
+### PASSO 5: VALIDAÇÃO DOS DADOS E CÁLCULO DE PEGADA DE CARBONO (SPECIALIST)
+### =========================================================================
+
+### 5.1 Especialista audita o documento e aprova os dados validados
+# Esta ação atualiza o documento para VALIDATED e gera a ligação de CO2 com o lote.
+POST {{baseUrl}}/documents/{{documentId}}/validate
+Authorization: Bearer {{specialistToken}}
+Content-Type: application/json
+
+{
+  "extractedData": {
+    "productName": "Garrafas Pet Recicladas PCR",
+    "co2Emitted": 125.80,
+    "supplier": "EcoPlast Embalagens LTDA"
+  }
+}
+
+### 5.2 Especialista calcula a pegada consolidada de carbono do Lote
+# Soma todos os documentos validados associados aos fornecedores deste lote.
+POST {{baseUrl}}/batches/LOT-E2E-999/calculate-co2
+Authorization: Bearer {{specialistToken}}
+
+
+### 5.3 Especialista verifica conformidade do lote
+# Compara o valor consolidado com as regras ecológicas configuradas.
+GET {{baseUrl}}/batches/LOT-E2E-999/compliance
+Authorization: Bearer {{specialistToken}}
+
+
+### =========================================================================
+### PASSO 6: REGISTRO NA BLOCKCHAIN LOCAL (SPECIALIST / ADMIN)
+### =========================================================================
+
+### 6.1 Registra o Lote na Blockchain (Hardhat Node Local)
+# Grava permanentemente: batchId, productName, co2Emitted, empresa, conformidade e hash IPFS.
+POST {{baseUrl}}/batches/LOT-E2E-999/register-blockchain
+Authorization: Bearer {{specialistToken}}
+
+
+### =========================================================================
+### PASSO 7: CONSULTA E VERIFICAÇÃO PÚBLICA (AUDITOR / PÚBLICO)
+### =========================================================================
+
+### 7.1 Consultar Lote e obter os dados consolidados e o Hash da Blockchain
+# O auditor lê o QR Code (que aponta para este lote) e obtém os dados públicos e prova na chain.
+GET {{baseUrl}}/batches/LOT-E2E-999
+Authorization: Bearer {{managerToken}}
