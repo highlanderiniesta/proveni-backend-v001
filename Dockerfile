@@ -13,7 +13,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Instalação LIMPA (melhor que npm install)
-RUN npm ci --production=false
+RUN npm install
 
 COPY . .
 RUN npm run build
